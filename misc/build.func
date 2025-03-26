@@ -699,14 +699,43 @@ advanced_settings() {
   if [ "$var_os" == "alpine" ]; then
     APT_CACHER=""
     APT_CACHER_IP=""
-  else
-    if APT_CACHER_IP=$(whiptail --backtitle "Proxmox VE Helper Scripts" --inputbox "Set APT-Cacher IP (leave blank for none)" 8 58 --title "APT-Cacher IP" 3>&1 1>&2 2>&3); then
-      APT_CACHER="${APT_CACHER_IP:+yes}"
-      echo -e "${NETWORK}${BOLD}${DGN}APT-Cacher IP Address: ${BGN}${APT_CACHER_IP:-Default}${CL}"
-    else
-      exit_script
+    echo -e "${NETWORK}${BOLD}${DGN}APT-Cacher: ${BGN}Disabled (Alpine Linux)${CL}"
+else
+    # Автопоиск apt-cacher в локальной сети
+    local detected_cacher=""
+    if command -v ping &>/dev/null && ping -c 1 -W 1 apt.local &>/dev/null; then
+        detected_cacher="apt.local"
     fi
-  fi
+
+    # Всегда показываем диалог, но с подставленным значением если найдено
+    if APT_CACHER_IP=$(whiptail --backtitle "Proxmox VE Helper Scripts" \
+                               --inputbox "Enter APT-Cacher server IP/hostname\n(Leave empty to disable)" \
+                               8 58 "$detected_cacher" \
+                               --title "APT-Cacher Configuration" \
+                               3>&1 1>&2 2>&3); then
+        
+        # Обработка ввода
+        if [[ -n "$APT_CACHER_IP" ]]; then
+            # Базовая проверка формата
+            if [[ "$APT_CACHER_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || [[ "$APT_CACHER_IP" =~ ^[a-zA-Z0-9.-]+$ ]]; then
+                APT_CACHER="yes"
+                echo -e "${NETWORK}${BOLD}${DGN}APT-Cacher: ${BGN}${APT_CACHER_IP}${CL}"
+            else
+                msg_error "Invalid IP/hostname format!"
+                APT_CACHER=""
+                APT_CACHER_IP=""
+                echo -e "${NETWORK}${BOLD}${DGN}APT-Cacher: ${BGN}Disabled (invalid input)${CL}"
+            fi
+        else
+            APT_CACHER=""
+            APT_CACHER_IP=""
+            echo -e "${NETWORK}${BOLD}${DGN}APT-Cacher: ${BGN}Disabled${CL}"
+        fi
+    else
+        exit_script
+    fi
+fi
+
 
   if (whiptail --backtitle "Proxmox VE Helper Scripts" --defaultno --title "IPv6" --yesno "Disable IPv6?" 10 58); then
     DISABLEIP6="yes"
